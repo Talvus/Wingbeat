@@ -1,0 +1,28 @@
+[package]
+name = "wingbeat"
+version = "0.1.0"
+edition = "2021"
+authors = ["Wingbeat Contributors"]
+description = "A swarm-based distributed computation protocol where subgraphs organize like tornadoes"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+petgraph = "0.6"
+rand = "0.8"
+colored = "2.0"
+dashmap = "5.5"
+async-trait = "0.1"
+futures = "0.3"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+clap = { version = "4.5", features = ["derive"] }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "swarm_benchmark"
+harness = false 
