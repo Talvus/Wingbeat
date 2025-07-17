@@ -5,16 +5,18 @@ use crate::{
     inference::{ModelWeights, Tensor, LayerOperation},
 };
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 /// Enhanced processor that integrates model decomposition with swarm processing
 pub struct EnhancedProcessor {
-    pub swarm: TornadoSwarm,
+    pub swarm: Arc<TornadoSwarm>,
     pub decomposer: ModelDecomposer,
 }
 
 impl EnhancedProcessor {
-    pub fn new(swarm: TornadoSwarm, decomposer: ModelDecomposer) -> Self {
+    pub fn new(swarm: Arc<TornadoSwarm>, decomposer: ModelDecomposer) -> Self {
         Self { swarm, decomposer }
     }
 
@@ -22,23 +24,29 @@ impl EnhancedProcessor {
     pub async fn process_prompt(&mut self, prompt: &str) -> Result<SwarmPromptResult, String> {
         println!("🌪️  Processing prompt: '{}'", prompt);
         
-        // Decompose the model into subgraphs
-        let subgraphs = self.decomposer.decompose_model(&ModelWeights::new())?;
+        // Decompose the model into subgraphs using the correct parameter type
+        let subgraphs = self.decomposer.decompose_model(DecompositionStrategy::LayerWise).await;
         println!("   Decomposed into {} subgraphs", subgraphs.len());
         
         // Distribute subgraphs across the swarm
         let mut distributed_subgraphs = Vec::new();
+        let tornadoes = self.swarm.tornadoes.read().await;
+        let tornado_count = tornadoes.len();
+        drop(tornadoes); // Release the read lock
+        
         for (i, subgraph) in subgraphs.iter().enumerate() {
-            let tornado = &mut self.swarm.tornadoes[i % self.swarm.tornadoes.len()];
-            tornado.sweep_up_subgraph(subgraph.clone());
+            let tornadoes = self.swarm.tornadoes.read().await;
+            let tornado = &tornadoes[i % tornado_count];
+            tornado.sweep_up(Arc::new(RwLock::new(subgraph.clone()))).await;
             distributed_subgraphs.push(subgraph.clone());
             println!("   Subgraph {} distributed to tornado {}", i, tornado.id);
         }
         
         // Simulate computation in the swarm
         println!("   🌀 Spinning tornadoes...");
-        for tornado in &mut self.swarm.tornadoes {
-            tornado.spin();
+        let tornadoes = self.swarm.tornadoes.read().await;
+        for tornado in tornadoes.iter() {
+            tornado.spin().await;
         }
         
         // Process the prompt through each subgraph
@@ -54,8 +62,9 @@ impl EnhancedProcessor {
         println!("   ✅ Results reintegrated");
         
         // Release subgraphs back to the swarm
-        for tornado in &mut self.swarm.tornadoes {
-            tornado.release_subgraphs();
+        let tornadoes = self.swarm.tornadoes.read().await;
+        for tornado in tornadoes.iter() {
+            tornado.release(1).await;
         }
         
         Ok(SwarmPromptResult {
@@ -69,6 +78,9 @@ impl EnhancedProcessor {
     async fn process_subgraph(&self, subgraph: &Subgraph, prompt: &str) -> Result<String, String> {
         // Simulate processing based on subgraph type
         match subgraph.subgraph_type {
+            SubgraphType::Transformer => {
+                Ok(format!("[Transformed: {}]", prompt))
+            }
             SubgraphType::Embedding => {
                 Ok(format!("[Embedded: {}]", prompt))
             }
@@ -78,7 +90,7 @@ impl EnhancedProcessor {
             SubgraphType::FeedForward => {
                 Ok(format!("[Processed: {}]", prompt))
             }
-            SubgraphType::Output => {
+            SubgraphType::OutputLayer => {
                 Ok(format!("[Output: {}]", prompt))
             }
             SubgraphType::Custom(_) => {
@@ -112,20 +124,25 @@ impl EnhancedProcessor {
         println!("🚀 Running distributed inference for: '{}'", prompt);
         
         // Decompose model with real weights
-        let subgraphs = self.decomposer.decompose_model(weights)?;
+        let subgraphs = self.decomposer.decompose_model(DecompositionStrategy::LayerWise).await;
         println!("   Model decomposed into {} subgraphs", subgraphs.len());
         
         // Distribute across swarm
         let mut distributed_results = Vec::new();
+        let tornadoes = self.swarm.tornadoes.read().await;
+        let tornado_count = tornadoes.len();
+        drop(tornadoes); // Release the read lock
+
         for (i, subgraph) in subgraphs.iter().enumerate() {
-            let tornado = &mut self.swarm.tornadoes[i % self.swarm.tornadoes.len()];
-            tornado.sweep_up_subgraph(subgraph.clone());
+            let tornadoes = self.swarm.tornadoes.read().await;
+            let tornado = &tornadoes[i % tornado_count];
+            tornado.sweep_up(Arc::new(RwLock::new(subgraph.clone()))).await;
             
             // Simulate inference on this subgraph
             let result = self.simulate_inference_on_subgraph(subgraph, prompt, weights).await?;
             distributed_results.push(result);
             
-            tornado.release_subgraphs();
+                         tornado.release(1).await;
         }
         
         // Combine results
@@ -143,6 +160,11 @@ impl EnhancedProcessor {
     ) -> Result<String, String> {
         // Simulate different types of inference based on subgraph type
         match subgraph.subgraph_type {
+            SubgraphType::Transformer => {
+                // Simulate full transformer computation
+                let layer_count = weights.parameter_count() / 1000000; // Rough estimate
+                Ok(format!("Computed through {} transformer layers", layer_count))
+            }
             SubgraphType::Embedding => {
                 // Simulate embedding lookup
                 let token_count = prompt.split_whitespace().count();
@@ -158,7 +180,7 @@ impl EnhancedProcessor {
                 let hidden_size = 768;
                 Ok(format!("Processed through {} hidden units", hidden_size))
             }
-            SubgraphType::Output => {
+            SubgraphType::OutputLayer => {
                 // Simulate output projection
                 let vocab_size = weights.parameter_count() / 1000; // Rough estimate
                 Ok(format!("Projected to {} vocabulary tokens", vocab_size))

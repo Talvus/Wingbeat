@@ -5,6 +5,20 @@ use petgraph::graph::Graph;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// Unique identifier for subgraphs
+pub type SubgraphId = Uuid;
+
+/// Types of subgraphs in the system
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SubgraphType {
+    Transformer,
+    Attention,
+    FeedForward,
+    Embedding,
+    OutputLayer,
+    Custom(String),
+}
+
 /// Represents a single computation node in a subgraph
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComputeNode {
@@ -39,6 +53,7 @@ pub enum NodeState {
 #[derive(Debug)]
 pub struct Subgraph {
     pub id: Uuid,
+    pub subgraph_type: SubgraphType,
     pub graph: Arc<RwLock<Graph<ComputeNode, f32>>>,
     pub parent: Option<Uuid>,
     pub children: Vec<Uuid>,
@@ -49,6 +64,19 @@ impl Subgraph {
     pub fn new() -> Self {
         Self {
             id: Uuid::new_v4(),
+            subgraph_type: SubgraphType::Custom("default".to_string()),
+            graph: Arc::new(RwLock::new(Graph::new())),
+            parent: None,
+            children: Vec::new(),
+            tornado_strength: rand::random::<f32>(),
+        }
+    }
+
+    /// Create a new subgraph with a specific type
+    pub fn new_with_type(subgraph_type: SubgraphType) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            subgraph_type,
             graph: Arc::new(RwLock::new(Graph::new())),
             parent: None,
             children: Vec::new(),
@@ -97,6 +125,7 @@ impl Clone for Subgraph {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
+            subgraph_type: self.subgraph_type.clone(),
             graph: Arc::clone(&self.graph),
             parent: self.parent,
             children: self.children.clone(),

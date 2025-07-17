@@ -11,7 +11,7 @@ pub struct Token {
 }
 
 /// Basic tokenizer interface
-pub trait Tokenizer {
+pub trait Tokenizer: std::fmt::Debug {
     fn encode(&self, text: &str) -> Result<Vec<Token>, String>;
     fn decode(&self, tokens: &[Token]) -> Result<String, String>;
     fn vocab_size(&self) -> usize;

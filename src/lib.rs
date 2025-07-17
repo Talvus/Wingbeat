@@ -4,7 +4,7 @@ pub mod computation;
 pub mod inference;
 
 pub use core::subgraph::{Subgraph, SubgraphId, SubgraphType};
-pub use swarm::tornado::{TornadoSwarm, Tornado};
+pub use swarm::tornado::{TornadoSwarm, Tornado, Vec3};
 pub use computation::{
     model_decomposer::{ModelDecomposer, LayerType, DecompositionStrategy},
     enhanced_processor::EnhancedProcessor,

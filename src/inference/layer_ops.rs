@@ -1,6 +1,9 @@
-use crate::inference::{tensor_ops::Tensor, model_weights::ModelWeights};
+use crate::inference::tensor_ops::TensorOps;
+use crate::inference::{Tensor, ModelWeights, ModelParameter};
 use crate::computation::model_decomposer::LayerType;
+use async_trait::async_trait;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use uuid::Uuid;
 
 /// Input/output context for layer operations
@@ -19,7 +22,7 @@ pub struct LayerResult {
 }
 
 /// Trait for layer operations that can be executed
-pub trait LayerOperation {
+pub trait LayerOperation: std::fmt::Debug {
     fn execute(&self, context: LayerContext, weights: &ModelWeights) -> Result<LayerResult, String>;
     fn layer_type(&self) -> LayerType;
     fn layer_id(&self) -> Uuid;

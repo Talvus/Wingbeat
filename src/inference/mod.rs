@@ -3,6 +3,8 @@ pub mod model_weights;
 pub mod layer_ops;
 pub mod tokenizer;
 
+use std::collections::HashMap;
+
 pub use tensor_ops::{Tensor, DataType, TensorOps};
 pub use model_weights::{ModelWeights, ModelParameter};
 pub use layer_ops::{LayerOperation, LayerContext, LayerResult, LayerFactory};
